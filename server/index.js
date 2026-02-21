@@ -466,6 +466,7 @@ app.use((err, req, res, next) => {
 
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
+  console.log('Gemini key present:', Boolean(process.env.GEMINI_API_KEY));
 });
 
 module.exports = app;
