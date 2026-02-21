@@ -62,7 +62,7 @@ const path = require('path');
 // Attempt to load Google Generative AI SDK (optional)
 let GoogleGenerativeAI = null;
 try {
-  GoogleGenerativeAI = require('@google/generative-ai').GoogleGenerativeAI;
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 } catch (e) {
   GoogleGenerativeAI = null;
 }
@@ -272,8 +272,7 @@ app.post('/api/risk-assess', rateLimitMiddleware, async (req, res) => {
 
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash-latest',
-        generationConfig: { responseMimeType: 'application/json' },
+        model: process.env.GEMINI_MODEL || "gemini-1.5-flash",
       });
 
       const prompt = `Given the scenario input: ${JSON.stringify(
@@ -486,8 +485,6 @@ app.get('/', (req, res) =>
     },
   })
 );
-app.get('/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
-app.get('/api/docs', (req, res) => res.json({ ok: true, note: 'docs endpoint is live' }));
 
 // Gemini ping endpoint
 app.get('/api/gemini-ping', async (req, res) => {
@@ -509,7 +506,7 @@ app.get('/api/gemini-ping', async (req, res) => {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest', generationConfig: { responseMimeType: 'application/json' } });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash', generationConfig: { responseMimeType: 'application/json' } });
     console.log('Gemini ping start');
     const prompt = 'Return JSON only: {"pong":true}';
     const result = await model.generateContent(prompt);
@@ -559,21 +556,40 @@ app.get('/api/debug-gemini', (req, res) => {
 });
 
 // List available Gemini models
-app.get('/api/gemini-models', async (req, res) => {
+app.get("/api/gemini-models", async (req, res) => {
   try {
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const resp = await genAI.listModels();
-    return res.json({
-      ok: true,
-      models: (resp.models || []).map((m) => ({
-        name: m.name,
-        supportedGenerationMethods: m.supportedGenerationMethods,
-      })),
-    });
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) return res.status(400).json({ ok: false, error: "no_key" });
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(
+      key
+    )}`;
+
+    const r = await fetch(url);
+    const data = await r.json();
+
+    if (!r.ok) {
+      return res.status(200).json({
+        ok: false,
+        error: "list_models_failed",
+        message: data?.error?.message || "unknown_error",
+        raw: data,
+      });
+    }
+
+    const models = (data.models || []).map((m) => ({
+      name: m.name,
+      supportedGenerationMethods: m.supportedGenerationMethods || [],
+    }));
+
+    return res.json({ ok: true, models });
   } catch (err) {
-    console.error('Gemini listModels error:', err?.message || err);
-    return res.json({ ok: false, error: 'list_models_failed', message: err?.message || String(err) });
+    console.error("Gemini models error:", err?.message || err);
+    return res.status(200).json({
+      ok: false,
+      error: "list_models_failed",
+      message: err?.message || String(err),
+    });
   }
 });
 
