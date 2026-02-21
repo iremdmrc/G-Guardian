@@ -558,6 +558,25 @@ app.get('/api/debug-gemini', (req, res) => {
   });
 });
 
+// List available Gemini models
+app.get('/api/gemini-models', async (req, res) => {
+  try {
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const resp = await genAI.listModels();
+    return res.json({
+      ok: true,
+      models: (resp.models || []).map((m) => ({
+        name: m.name,
+        supportedGenerationMethods: m.supportedGenerationMethods,
+      })),
+    });
+  } catch (err) {
+    console.error('Gemini listModels error:', err?.message || err);
+    return res.json({ ok: false, error: 'list_models_failed', message: err?.message || String(err) });
+  }
+});
+
 // 404 catch-all - placed after all routes
 app.use((req, res) => {
   res.status(404).send('Not Found');
