@@ -263,13 +263,15 @@ app.post('/api/risk-assess', rateLimitMiddleware, async (req, res) => {
         body
       )}\n\nReturn STRICT JSON ONLY (no markdown, no backticks) with keys:\n- riskScore (number 0-100)\n- riskLevel ("LOW"|"MEDIUM"|"HIGH")\n- reasoning (1-2 short sentences)\n- guardianMessage (supportive)\n- saferAction (one actionable)\n\nRespond with only the JSON object.`;
 
+      console.log('Gemini call start');
       const response = await client.generate({ model: 'gemini-1.5-flash', input: prompt });
       // attempt common fields used by SDKs
       text = (response?.outputText || response?.text || response?.content || '') + '';
       text = text.trim();
+      console.log('Gemini raw length:', text?.length);
     } catch (err) {
       // SDK failed or not installed -> fallback
-      console.error('Gemini SDK call error:', err && err.message ? err.message : err);
+      console.error('Gemini SDK error:', err?.message || err);
       const out = fallbackRisk(body);
       return sendResult(out, 'fallback');
     }
@@ -279,13 +281,17 @@ app.post('/api/risk-assess', rateLimitMiddleware, async (req, res) => {
     try {
       parsed = JSON.parse(text);
     } catch (e) {
-      // try to extract JSON substring
+      // log parse failure and preview, then try to extract JSON substring
+      console.error('Gemini JSON parse failed:', e?.message);
+      console.error('Gemini raw preview:', text?.slice(0, 200));
       const first = text.indexOf('{');
       const last = text.lastIndexOf('}');
       if (first !== -1 && last !== -1 && last > first) {
         try {
           parsed = JSON.parse(text.slice(first, last + 1));
         } catch (e2) {
+          console.error('Gemini JSON parse failed (substring):', e2?.message);
+          console.error('Gemini raw preview:', text?.slice(0, 200));
           parsed = null;
         }
       }
