@@ -280,6 +280,7 @@ app.post('/api/risk-assess', rateLimitMiddleware, async (req, res) => {
     } catch (err) {
       // SDK failed or not installed -> fallback
       console.error('Gemini SDK error:', err?.message || err);
+      console.error('Gemini failed:', err?.message || err);
       const out = fallbackRisk(body);
       return sendResult(out, 'fallback');
     }
@@ -313,6 +314,10 @@ app.post('/api/risk-assess', rateLimitMiddleware, async (req, res) => {
       !isFinite(Number(parsed.riskScore)) ||
       !parsed.riskLevel
     ) {
+      console.error('Gemini response invalid or missing fields, falling back', {
+        riskScore: parsed && parsed.riskScore,
+        riskLevel: parsed && parsed.riskLevel,
+      });
       const out = fallbackRisk(body);
       return sendResult(out, 'fallback');
     }
