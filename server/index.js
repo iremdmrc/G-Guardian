@@ -469,6 +469,68 @@ app.get('/', (req, res) =>
 app.get('/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
 app.get('/api/docs', (req, res) => res.json({ ok: true, note: 'docs endpoint is live' }));
 
+// Gemini ping endpoint
+app.get('/api/gemini-ping', async (req, res) => {
+  const key = process.env.GEMINI_API_KEY;
+  function isPlaceholderKey(k) {
+    if (!k) return true;
+    const s = String(k).toLowerCase();
+    return /your|placeholder|change|replace|xxxx|example/.test(s);
+  }
+
+  if (isPlaceholderKey(key)) {
+    return res.json({ ok: false, error: 'no_key' });
+  }
+
+  try {
+    const genai = require('@google/generative-ai');
+    const TextGenerationClient = genai?.TextGenerationClient || genai?.default?.TextGenerationClient || genai?.TextGeneration || genai?.default?.TextGeneration || null;
+    if (!TextGenerationClient) {
+      console.error('Gemini SDK error: TextGenerationClient not available');
+      return res.json({ ok: false, model: 'fallback', error: 'gemini_failed' });
+    }
+
+    const client = new TextGenerationClient({ apiKey: key });
+    console.log('Gemini ping start');
+    const prompt = 'Return JSON only: {"pong":true}';
+    const response = await client.generate({ model: 'gemini-1.5-flash', input: prompt });
+    const text = (response?.outputText || response?.text || response?.content || '') + '';
+    console.log('Gemini ping raw length:', text?.length);
+
+    // parse first JSON object
+    let parsed = null;
+    const first = text.indexOf('{');
+    const last = text.lastIndexOf('}');
+    if (first !== -1 && last !== -1 && last > first) {
+      try {
+        parsed = JSON.parse(text.slice(first, last + 1));
+      } catch (e) {
+        console.error('Gemini ping parse failed:', e?.message);
+        console.error('Gemini ping preview:', text?.slice(0, 200));
+        parsed = null;
+      }
+    } else {
+      try {
+        parsed = JSON.parse(text);
+      } catch (e) {
+        console.error('Gemini ping parse failed:', e?.message);
+        console.error('Gemini ping preview:', text?.slice(0, 200));
+        parsed = null;
+      }
+    }
+
+    if (parsed && parsed.pong === true) {
+      return res.json({ ok: true, model: 'gemini', pong: true });
+    }
+
+    console.error('Gemini ping unexpected response');
+    return res.json({ ok: false, model: 'fallback', error: 'gemini_failed' });
+  } catch (err) {
+    console.error('Gemini ping error:', err?.message || err);
+    return res.json({ ok: false, model: 'fallback', error: 'gemini_failed' });
+  }
+});
+
 // 404 catch-all - placed after all routes
 app.use((req, res) => {
   res.status(404).send('Not Found');
