@@ -328,6 +328,7 @@ app.post('/api/risk-assess', rateLimitMiddleware, async (req, res) => {
     return sendResult(parsed, 'gemini');
   } catch (err) {
     console.error('Unexpected error in /api/risk-assess:', err);
+    console.error('Gemini failed:', err?.message || err);
     const out = fallbackRisk(body);
     return sendResult(out, 'fallback');
   }
@@ -539,6 +540,14 @@ app.get('/api/gemini-ping', async (req, res) => {
     console.error('Gemini ping error:', err?.message || err);
     return res.json({ ok: false, model: 'fallback', error: 'gemini_failed' });
   }
+});
+
+app.get('/api/debug-gemini', (req, res) => {
+  res.json({
+    ok: true,
+    geminiKeyPresent: Boolean(process.env.GEMINI_API_KEY),
+    note: 'If risk-assess still returns fallback, check Render logs for Gemini error.',
+  });
 });
 
 // 404 catch-all - placed after all routes
