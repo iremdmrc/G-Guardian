@@ -59,6 +59,14 @@ const SCENARIOS = [
 const fs = require('fs');
 const path = require('path');
 
+// Attempt to load Google Generative AI SDK (optional)
+let GoogleGenerativeAI = null;
+try {
+  GoogleGenerativeAI = require('@google/generative-ai').GoogleGenerativeAI;
+} catch (e) {
+  GoogleGenerativeAI = null;
+}
+
 const MEMORY_FILE = path.join(__dirname, 'memory.json');
 let MEMORY = { hasMemory: false, lastLowScenarioId: null, lastSaferAction: null };
 
@@ -256,25 +264,26 @@ app.post('/api/risk-assess', rateLimitMiddleware, async (req, res) => {
   try {
     let text = null;
     try {
-      // Support CommonJS require shapes and ESM default shape
-      const genai = require('@google/generative-ai');
-      const TextGenerationClient = genai?.TextGenerationClient || genai?.default?.TextGenerationClient || genai?.TextGeneration || genai?.default?.TextGeneration || null;
-      if (!TextGenerationClient) {
-        console.error('Gemini SDK error: TextGenerationClient not found in @google/generative-ai');
+      if (!GoogleGenerativeAI) {
+        console.error('Gemini SDK error: @google/generative-ai not available');
         const out = fallbackRisk(body);
         return sendResult(out, 'fallback');
       }
 
-      const client = new TextGenerationClient({ apiKey: key });
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-1.5-flash',
+        generationConfig: { responseMimeType: 'application/json' },
+      });
 
       const prompt = `Given the scenario input: ${JSON.stringify(
         body
       )}\n\nReturn STRICT JSON ONLY (no markdown, no backticks) with keys:\n- riskScore (number 0-100)\n- riskLevel ("LOW"|"MEDIUM"|"HIGH")\n- reasoning (1-2 short sentences)\n- guardianMessage (supportive)\n- saferAction (one actionable)\n\nRespond with only the JSON object.`;
 
       console.log('Gemini call start');
-      const response = await client.generate({ model: 'gemini-1.5-flash', input: prompt });
-      // attempt common fields used by SDKs
-      text = (response?.outputText || response?.text || response?.content || '') + '';
+      const result = await model.generateContent(prompt);
+      const responseText = (result?.response?.text && typeof result.response.text === 'function') ? result.response.text() : (result?.response?.text || result?.response || '');
+      text = String(responseText || '');
       text = text.trim();
       console.log('Gemini raw preview:', text.slice(0, 200));
     } catch (err) {
@@ -494,18 +503,17 @@ app.get('/api/gemini-ping', async (req, res) => {
   }
 
   try {
-    const genai = require('@google/generative-ai');
-    const TextGenerationClient = genai?.TextGenerationClient || genai?.default?.TextGenerationClient || genai?.TextGeneration || genai?.default?.TextGeneration || null;
-    if (!TextGenerationClient) {
-      console.error('Gemini SDK error: TextGenerationClient not available');
+    if (!GoogleGenerativeAI) {
+      console.error('Gemini SDK error: @google/generative-ai not available');
       return res.json({ ok: false, model: 'fallback', error: 'gemini_failed' });
     }
 
-    const client = new TextGenerationClient({ apiKey: key });
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash', generationConfig: { responseMimeType: 'application/json' } });
     console.log('Gemini ping start');
     const prompt = 'Return JSON only: {"pong":true}';
-    const response = await client.generate({ model: 'gemini-1.5-flash', input: prompt });
-    const text = (response?.outputText || response?.text || response?.content || '') + '';
+    const result = await model.generateContent(prompt);
+    const text = String((result?.response?.text && typeof result.response.text === 'function') ? result.response.text() : (result?.response?.text || result?.response || ''));
     console.log('Gemini ping raw length:', text?.length);
 
     // parse first JSON object
