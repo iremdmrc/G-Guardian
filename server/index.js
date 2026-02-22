@@ -1,20 +1,24 @@
 "use strict";
 
-
-require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
+const ElevenLabs = require("elevenlabs-node");
+require("dotenv").config();
 
+// 1. Önce APP'i oluşturuyoruz
 const app = express();
 
-app.use('/audio', express.static('public/audio'));
+// 2. SONRA Middleware'leri ekliyoruz (Sıralama önemli!)
+app.use(cors()); // Artık çalışır çünkü app yukarıda tanımlandı
+app.use(express.json({ limit: "1mb" }));
+app.use('/audio', express.static(path.join(__dirname, 'public/audio')));
 
 /** ---------------------------
- * Middleware
+ * ElevenLabs & Routes
  * -------------------------- */
-app.use(express.json({ limit: "1mb" }));
+// Buradan aşağısı senin ses ve diğer rotalarınla devam edecek...
 
 app.use(
   cors({
@@ -130,7 +134,6 @@ const voices = {
     "karakter3": "vk5Z2I6NlhnKyBZniMGE"
 };
 
-const ElevenLabs = require("elevenlabs-node");
 
 // Initialize ElevenLabs
 const voice = new ElevenLabs({
