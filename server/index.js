@@ -612,6 +612,35 @@ app.delete("/api/guardians/:id", rateLimitMiddleware, (req, res) => {
   res.json({ ok: true, deleted: list.length - next.length });
 });
 
+// index.js içine eklenecek rota
+app.get('/api/music', (req, res) => {
+  const musicList = require('./music.json');
+  res.json(musicList);
+});
+
+app.post('/api/voice/speak', async (req, res) => {
+  const { text, voiceId } = req.body;
+  // Burada ElevenLabs API anahtarını kullanacaksın
+  // Örnek: res.json({ audioUrl: "generated_audio_link_here" });
+  console.log("Karakter konuşuyor:", text);
+  res.json({ success: true, message: "Ses başarıyla oluşturuldu" });
+});
+
+app.post('/api/emergency/prepare', (req, res) => {
+  const guardians = require('./guardians.json'); // Koruyucuları oku
+  const location = require('./lastLocation.json'); // Son konumu al
+  
+  const emergencyPackage = {
+    risk: req.body.riskLevel,
+    note: req.body.note,
+    currentLocation: location,
+    notifiedGuardians: guardians.map(g => g.name) // Kimlere haber gitti?
+  };
+  
+  console.log("ACİL DURUM PAKETİ HAZIRLANDI:", emergencyPackage);
+  res.json(emergencyPackage);
+});
+
 /** ---------------------------
  * Location endpoints
  * -------------------------- */

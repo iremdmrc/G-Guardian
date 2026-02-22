@@ -7,5 +7,6 @@
     "riskLevel": "HIGH",
     "contactType": "friend",
     "preview": "Hey, I feel unsafe near Near Newark Penn Station (walking alone). Can you stay on call with me for 10 minutes? If I stop"
-  }
+  },
+  "lastLocationTs": 123
 }
