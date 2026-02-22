@@ -1,5 +1,11 @@
 {
   "hasMemory": true,
   "lastLowScenarioId": "S3",
-  "lastSaferAction": "Proceed but remain aware of surroundings."
+  "lastSaferAction": "Proceed but remain aware of surroundings.",
+  "lastGeneratedMessage": {
+    "ts": 1771744668191,
+    "riskLevel": "HIGH",
+    "contactType": "friend",
+    "preview": "Hey, I feel unsafe near Near Newark Penn Station (walking alone). Can you stay on call with me for 10 minutes? If I stop"
+  }
 }
