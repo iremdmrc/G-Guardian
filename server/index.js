@@ -1,5 +1,6 @@
 "use strict";
 
+
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -7,6 +8,8 @@ const fs = require("fs");
 const path = require("path");
 
 const app = express();
+
+app.use('/audio', express.static('public/audio'));
 
 /** ---------------------------
  * Middleware
@@ -119,6 +122,49 @@ const cleanupTimer = setInterval(() => {
   }
 }, RATE_LIMIT_WINDOW_MS);
 if (cleanupTimer.unref) cleanupTimer.unref();
+
+// Define your character voice IDs here
+const voices = {
+    "karakter1": "4Rr0McEuXzvEW6gtlIol",
+    "karakter2": "ZLc2glTorLjbg1Qfo62L",
+    "karakter3": "vk5Z2I6NlhnKyBZniMGE"
+};
+
+const ElevenLabs = require("elevenlabs-node");
+
+// Initialize ElevenLabs
+const voice = new ElevenLabs({
+    apiKey: "sk_690f187cf621a35ef7b377ad0abc6bdecffd9dbcdb9b79de", // Replace with your actual API Key
+    voiceId: "pNInz6obpgDQGcFmaJgB",       // This is a default voice ID (Adam)
+});
+
+app.post('/api/voice/speak', async (req, res) => {
+    const { text, characterName } = req.body; // characterName: 'karakter1', 'karakter2' etc.
+
+    // Select the ID based on the name, fallback to character1
+    const selectedVoiceId = voices[characterName] || voices.karakter1;
+
+    try {
+        const fileName = `speech_${Date.now()}.mp3`;
+        
+        // Overriding the voiceId for this specific request
+        const response = await voice.textToSpeech({
+            fileName: `./public/audio/${fileName}`,
+            textInput: text,
+            voiceId: selectedVoiceId // Uses the selected character's ID
+        });
+
+        console.log(`Character ${characterName} is speaking:`, text);
+        res.json({ 
+            success: true, 
+            audioUrl: `http://localhost:8080/audio/${fileName}`,
+            characterUsed: characterName
+        });
+    } catch (error) {
+        console.error("ElevenLabs Error:", error);
+        res.status(500).json({ success: false, error: "Failed to generate voice" });
+    }
+});
 
 /** ---------------------------
  * Scenarios (preset)
@@ -612,32 +658,34 @@ app.delete("/api/guardians/:id", rateLimitMiddleware, (req, res) => {
   res.json({ ok: true, deleted: list.length - next.length });
 });
 
-// index.js içine eklenecek rota
+// Route to get the music playlist
 app.get('/api/music', (req, res) => {
   const musicList = require('./music.json');
   res.json(musicList);
 });
 
+// Route for character voice synthesis (ElevenLabs integration)
 app.post('/api/voice/speak', async (req, res) => {
   const { text, voiceId } = req.body;
-  // Burada ElevenLabs API anahtarını kullanacaksın
-  // Örnek: res.json({ audioUrl: "generated_audio_link_here" });
-  console.log("Karakter konuşuyor:", text);
-  res.json({ success: true, message: "Ses başarıyla oluşturuldu" });
+  // Use your ElevenLabs API key here
+  // Example: res.json({ audioUrl: "generated_audio_link_here" });
+  console.log("Character is speaking:", text);
+  res.json({ success: true, message: "Voice generated successfully" });
 });
 
+// Route to prepare the emergency package
 app.post('/api/emergency/prepare', (req, res) => {
-  const guardians = require('./guardians.json'); // Koruyucuları oku
-  const location = require('./lastLocation.json'); // Son konumu al
+  const guardians = require('./guardians.json'); // Read guardian data
+  const location = require('./lastLocation.json'); // Get the last known location
   
   const emergencyPackage = {
     risk: req.body.riskLevel,
     note: req.body.note,
     currentLocation: location,
-    notifiedGuardians: guardians.map(g => g.name) // Kimlere haber gitti?
+    notifiedGuardians: guardians.map(g => g.name) // List names of notified guardians
   };
   
-  console.log("ACİL DURUM PAKETİ HAZIRLANDI:", emergencyPackage);
+  console.log("EMERGENCY PACKAGE PREPARED:", emergencyPackage);
   res.json(emergencyPackage);
 });
 
